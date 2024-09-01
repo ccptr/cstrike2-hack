@@ -77,11 +77,6 @@ unsafe extern "system" fn hk_create_move(
 ///
 /// If `MinHook` fails to initialize, an error is returned with a message indicating the failure.
 pub fn initialize_hooks() -> anyhow::Result<()> {
-    // Initialize MinHook
-    if let Err(status) = utils::hook_system::initialize_minhook() {
-        bail!("failed to initialize MinHook: {status}");
-    }
-
     // Find the target addresses for the game functions
     let create_move_target = cs2::modules::client()
         .find_seq_of_bytes("48 8B C4 4C 89 48 20 55")
