@@ -3,8 +3,10 @@ pub mod core;
 pub mod cs2;
 pub mod utils;
 
+#[allow(unused_imports)]
 use common::{c_void, null_mut, Once};
 
+#[cfg(windows)]
 use windows::Win32::{
     Foundation::HMODULE,
     System::{
@@ -56,6 +58,7 @@ extern "system" fn thread_startup(_: *mut c_void) -> u32 {
 /// # Panics
 ///
 /// This function will panic if creating a thread fails.
+#[cfg(windows)]
 #[export_name = "DllMain"]
 pub extern "system" fn dll_main(
     _module: HMODULE,

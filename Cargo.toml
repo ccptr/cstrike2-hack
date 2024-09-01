@@ -2,7 +2,4 @@
 resolver = "2"
 members = ["cheat", "egui/egui-directx11", "egui/egui-win32", "macros/memory"]
 
-[workspace.dependencies]
-windows = "0.51.1"
-
 [workspace.lints.clippy]

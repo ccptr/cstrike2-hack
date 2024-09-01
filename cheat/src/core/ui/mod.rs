@@ -6,6 +6,8 @@ use egui::{
 };
 
 use std::sync::atomic::{AtomicBool, Ordering};
+
+#[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
     WM_CHAR, WM_DEVICECHANGE, WM_KEYDOWN, WM_KEYUP, WM_KILLFOCUS, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN,
     WM_LBUTTONUP, WM_MBUTTONDBLCLK, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSEMOVE,
