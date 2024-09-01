@@ -1,5 +1,5 @@
 use crate::common;
-use anyhow::bail;
+use anyhow::{bail, Context};
 use common::{c_void, from_mut, null_mut};
 use lazy_static::lazy_static;
 
@@ -16,6 +16,8 @@ pub struct Hook {
     detour: *mut c_void,
     /// A pointer to the original function.
     original: *mut c_void,
+    /// A place to store the RawDetour object so that it won't get dropped.
+    _hook: retour::RawDetour,
 }
 
 lazy_static! {
@@ -69,59 +71,29 @@ impl Hook {
     /// # Panics
     ///
     /// Panics if it fails to lock the `TARGETS` mutex.
-    #[must_use]
-    pub fn hook(target: *const c_void, detour: *const c_void) -> bool {
+    pub fn hook(target: *const c_void, detour: *const c_void) -> anyhow::Result<()> {
         let Ok(mut targets) = TARGETS.lock() else {
             tracing::error!("failed to lock TARGETS");
-            return false;
+            bail!("failed to lock TARGETS");
         };
 
-        let mut hk =
-            Self { target: target.cast_mut(), detour: detour.cast_mut(), original: null_mut() };
+        let hook = unsafe { retour::RawDetour::new(target as _, detour as _)? };
 
-        // SAFETY: Creating the hook with MinHook library.
-        let create_hook_result =
-            unsafe { minhook_sys::MH_CreateHook(hk.target, hk.detour, from_mut(&mut hk.original)) };
-
-        if create_hook_result == 0 {
-            // SAFETY: Enabling the hook with MinHook library.
-            unsafe {
-                minhook_sys::MH_EnableHook(hk.target);
-            }
-
-            targets.push_back(hk);
-
-            true
-        } else {
-            false
+        unsafe {
+            hook.enable()
+                .with_context(|| format!("failed to enable hook {target:p} -> {detour:p}"))?;
         }
+
+        let hk = Self {
+            target: target.cast_mut(),
+            detour: detour.cast_mut(),
+            original: hook.trampoline() as *const () as *const c_void as *mut c_void,
+            _hook: hook,
+        };
+
+        targets.push_back(hk);
+        Ok(())
     }
-}
-
-/// Initializes the `MinHook` library.
-///
-/// # Returns
-///
-/// Returns an `anyhow::Result` indicating success or failure. On success, it returns `Ok(())`. On failure, it returns an `Err` with a description of the error.
-///
-/// # Errors
-///
-/// - Returns an `Err` with a description if `MinHook` fails to initialize.
-///
-/// # Panics
-///
-/// This function does not panic, but it relies on `minhook_sys::MH_Initialize`, which may potentially fail.
-pub fn initialize_minhook() -> anyhow::Result<()> {
-    // Safety: We are calling an external C library function that initializes MinHook.
-    // The function `MH_Initialize` is expected to return 0 on success and a non-zero value on failure.
-    // We assume the library's documentation and contract are correct, and we handle the error accordingly.
-    if unsafe { minhook_sys::MH_Initialize() } != 0 {
-        bail!("failed to initialize MinHook");
-    }
-
-    tracing::info!("MinHook initialized successfully");
-
-    Ok(())
 }
 
 #[macro_export]
@@ -132,8 +104,8 @@ macro_rules! create_hook {
 
         tracing::info!("hooking target function: {target_function:p}");
 
-        if !hook_system::Hook::hook(target_function, detour_function_ptr) {
-            bail!("failed to enable hook");
+        if let Err(err) = hook_system::Hook::hook(target_function, detour_function_ptr) {
+            bail!("failed to create hook: {err}");
         }
     };
 }
