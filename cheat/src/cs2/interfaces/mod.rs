@@ -1,3 +1,5 @@
+use crate::common::CStr;
+
 pub mod engine_client;
 
 use std::sync::atomic::{AtomicPtr, Ordering};
@@ -26,8 +28,11 @@ macro_rules! define_interface {
     ($name:ident, $module_fn:ident, $interface_name:expr, $type:ty) => {
         paste::paste! {
             static [<INTERFACE_ $name:upper>]: once_cell::sync::Lazy<AtomicPtr<$type>> = once_cell::sync::Lazy::new(|| {
+                use super::modules::DLExt;
                 let interface_ptr = $crate::cs2::modules::$module_fn()
-                    .get_interface($interface_name)
+                    .get_interface(unsafe {
+                        CStr::from_bytes_with_nul_unchecked(concat!($interface_name, "\0").as_bytes())
+                    })
                     .expect(concat!("failed to find ", $interface_name)) as *mut $type;
                 AtomicPtr::new(interface_ptr)
             });
