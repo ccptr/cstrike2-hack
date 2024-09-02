@@ -104,8 +104,8 @@ macro_rules! create_hook {
 
         tracing::info!("hooking target function: {target_function:p}");
 
-        if let Err(err) = hook_system::Hook::hook(target_function, detour_function_ptr) {
-            bail!("failed to create hook: {err}");
+        if let Err(err) = crate::utils::hook_system::Hook::hook(target_function, detour_function_ptr) {
+            anyhow::bail!("failed to create hook: {err}");
         }
     };
 }
@@ -136,7 +136,7 @@ macro_rules! get_original_fn {
             std::mem::transmute::<
                 *mut std::ffi::c_void,
                 extern "system" fn($($arg),*) -> $ret,
-            >(hook_system::Hook::get_proto_original(|| $hook_name as *mut std::ffi::c_void).unwrap())
+            >(crate::utils::hook_system::Hook::get_proto_original(|| $hook_name as *mut std::ffi::c_void).unwrap())
         };
     };
 }
