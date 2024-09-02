@@ -42,8 +42,12 @@ pub fn initialize() -> anyhow::Result<()> {
 
     init_tracing().context("failed to initialize tracing")?;
 
-    cs2::modules::initialize_modules(&["client.dll", "engine2.dll", "gameoverlayrenderer64.dll"])
-        .context("failed to initialize modules")?;
+    cs2::modules::initialize_modules(&[
+        c"client.dll",
+        c"engine2.dll",
+        c"gameoverlayrenderer64.dll",
+    ])
+    .context("failed to initialize modules")?;
 
     render::setup().context("failed to setup renderer")?;
 

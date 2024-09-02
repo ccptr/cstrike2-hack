@@ -1,83 +1,14 @@
-use crate::{common, utils::module_handler};
-use anyhow::bail;
-use common::{c_void, Handle, Mutex};
+use crate::common::*;
 
+use anyhow::{bail, Context};
+use gher::DL;
 use once_cell::sync::OnceCell;
 
-/// A `Module` represents a dynamically loaded module.
-///
-/// This struct provides methods to interact with the module, such as finding sequences of bytes,
-/// retrieving exported functions, and obtaining interfaces.
-///
-/// # Fields
-/// - `name`: The name of the module.
-/// - `handle`: The handle to the loaded module.
-#[derive(Clone, Debug)]
-pub struct Module {
-    /// The name of the module.
-    name: &'static str,
-
-    /// The handle to the loaded module.
-    handle: Handle,
+pub trait DLExt {
+    fn get_interface(&self, interface_name: &CStr) -> Option<*const c_void>;
 }
 
-impl Module {
-    /// Creates a new `Module` by loading the module with the given name.
-    ///
-    /// # Parameters
-    /// - `name`: The name of the module to load.
-    ///
-    /// # Returns
-    /// A new `Module` instance.
-    ///
-    /// # Panics
-    /// This function will panic if the module cannot be loaded.
-    /// The panic occurs if `module_handler::get_module_handle(name)` returns `None`.
-    ///
-    /// # Examples
-    /// ```
-    /// let module = Module::new("example.dll");
-    /// ```
-    #[must_use]
-    pub fn new(name: &'static str) -> Self {
-        let handle = module_handler::get_module_handle(name).expect("failed to get module handle");
-        Self { name, handle }
-    }
-
-    /// Searches for a sequence of bytes in the module.
-    ///
-    /// # Parameters
-    /// - `pattern`: The byte pattern to search for.
-    ///
-    /// # Returns
-    /// The offset of the pattern if found, otherwise `None`.
-    ///
-    /// # Examples
-    /// ```
-    /// let offset = module.find_seq_of_bytes("pattern").unwrap_or(0);
-    /// ```
-    #[must_use]
-    pub fn find_seq_of_bytes<T>(&self, pattern: &str) -> anyhow::Result<*const T> {
-        module_handler::pattern_search(self.handle, pattern)
-    }
-
-    /// Retrieves the address of an exported function from the module.
-    ///
-    /// # Parameters
-    /// - `function_name`: The name of the function to retrieve.
-    ///
-    /// # Returns
-    /// A pointer to the function if found, otherwise `None`.
-    ///
-    /// # Examples
-    /// ```
-    /// let func_ptr = module.get_export("function_name");
-    /// ```
-    #[must_use]
-    pub fn get_export(&self, function_name: &str) -> Option<*mut c_void> {
-        module_handler::get_proc_address(self.handle, function_name)
-    }
-
+impl DLExt for gher::DL {
     /// Retrieves an interface from the module.
     ///
     /// # Parameters
@@ -88,32 +19,63 @@ impl Module {
     ///
     /// # Examples
     /// ```
-    /// let interface_ptr = module.get_interface("interface_name");
+    /// let interface_ptr = module.get_interface("CreateInterface");
     /// ```
     #[must_use]
-    pub fn get_interface(&self, interface_name: &str) -> Option<*const usize> {
-        module_handler::get_interface(self.handle, interface_name)
+    fn get_interface(&self, interface_name: &CStr) -> Option<*const c_void> {
+        get_interface(self, interface_name)
     }
+}
 
-    /// Returns the name of the module.
-    ///
-    /// # Returns
-    /// The name of the module.
-    ///
-    /// # Examples
-    /// ```
-    /// let module_name = module.name();
-    /// ```
-    #[must_use]
-    pub const fn name(&self) -> &str {
-        self.name
-    }
+/// Retrieves a pointer to a specific interface from a module.
+///
+/// This function uses the `CreateInterface` function from the specified module to obtain a pointer to
+/// a requested interface. The interface is identified by its name, which is passed as a parameter to
+/// the function.
+///
+/// # Parameters
+///
+/// * `module_handle`: A handle to the module containing the `CreateInterface` function.
+///   This can be obtained using the `get_module_handle` function.
+///
+/// * `interface_name`: A string representing the name of the interface to retrieve.
+///   The name should match the name used by the module to identify the interface.
+///
+/// # Returns
+///
+/// * `Some(interface_ptr)`: If the interface is successfully retrieved. The `interface_ptr` is a raw pointer
+///   to the requested interface.
+///
+/// * `None`: If the interface cannot be retrieved or if an error occurs.
+///
+/// # Note
+///
+/// The returned pointer is raw and should be used with caution. Ensure that the pointer is valid before
+/// dereferencing or using it.
+#[must_use]
+pub fn get_interface(module: &gher::DL, interface_name: &CStr) -> Option<*const c_void> {
+    type CreateInterfaceFn = unsafe extern "C" fn(*const c_char, *const c_int) -> *const c_void;
+
+    // SAFETY: We assume that `get_proc_address` returns a valid function pointer.
+    let create_interface_fn =
+        module.get_symbol(c"CreateInterface").map(|function| unsafe { transmute(function) });
+
+    let create_interface_fn: CreateInterfaceFn = if let Some(function) = create_interface_fn {
+        function
+    } else {
+        tracing::error!("failed to get function address for CreateInterface");
+        return None;
+    };
+
+    // SAFETY: We assume that `function` is a valid function pointer and `interface_name_cstr` is valid.
+    // TODO: can CreateInterface return null? If so we should probably check and return None
+    Some(unsafe { create_interface_fn(interface_name.as_ptr(), null_mut()) })
 }
 
 /// A global static variable holding the list of initialized modules.
 ///
 /// This variable is initialized only once and protected by a `Mutex` to ensure thread safety.
-static MODULES: OnceCell<Mutex<Vec<Module>>> = OnceCell::new();
+static MODULES: OnceCell<Mutex<Vec<gher::DL>>> = OnceCell::new();
 
 /// Initializes the global `MODULES` with the provided module names.
 ///
@@ -139,25 +101,18 @@ static MODULES: OnceCell<Mutex<Vec<Module>>> = OnceCell::new();
 ///     Err(e) => eprintln!("Failed to initialize modules: {:?}", e),
 /// }
 /// ```
-pub fn initialize_modules(names: &[&'static str]) -> anyhow::Result<()> {
+pub fn initialize_modules(names: &[&'static CStr]) -> anyhow::Result<()> {
     if MODULES.get().is_some() {
         bail!("modules are already initialized");
     }
 
-    let modules = names
-        .iter()
-        .map(|&name| {
-            let module = Module::new(name);
+    let mut modules = Vec::with_capacity(names.len());
+    for &name in names {
+        let dl = DL::open(name).with_context(|| format!("failed to open {name:?}"))?;
 
-            tracing::info!(
-                "initialized module: {} {:p}",
-                module.name,
-                module.handle.0 as *const c_void
-            );
-
-            module
-        })
-        .collect();
+        tracing::info!("initialized module: {:?} {:p}", dl.name(), dl.handle());
+        modules.push(dl);
+    }
 
     match MODULES.set(Mutex::new(modules)) {
         Ok(_) => {}
@@ -183,14 +138,16 @@ macro_rules! define_module_accessors {
             ///
             /// # Panics
             /// Panics if the module is not initialized or if the module is not found.
-            pub fn $name() -> &'static Module {
+            pub fn $name() -> &'static gher::DL {
+                #[cfg(windows)]
                 let module_name = concat!(stringify!($name), ".dll");
+                #[cfg(not(windows))]
+                let module_name = concat!(stringify!($name), ".so");
+
                 let modules_guard = MODULES.get().expect("modules are not initialized").lock();
                 let module = modules_guard.iter()
-                    .find(|module| module.name() == module_name)
-                    .unwrap_or_else(|| {
-                        panic!("module {} is not found", module_name);
-                    });
+                    .find(|module| module.name().as_bytes() == module_name.as_bytes())
+                    .unwrap_or_else(|| panic!("module {} is not found", module_name));
 
                 Box::leak(Box::new(module.clone()))
             }
