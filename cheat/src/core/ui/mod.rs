@@ -126,9 +126,8 @@ fn visuals_tab(ui: &mut Ui, settings: &mut VisualsSettings) {
 /// * `bool`: A boolean value indicating whether the input event corresponding to the given window message
 ///           should be blocked.
 pub fn should_block_input(msg: u32) -> bool {
-    let menu_visible = SHOW_MENU.load(Ordering::SeqCst);
-
-    menu_visible
+    #[cfg(windows)]
+    return SHOW_MENU.load(Ordering::SeqCst)
         && matches!(
             msg,
             WM_MOUSEMOVE
@@ -157,5 +156,8 @@ pub fn should_block_input(msg: u32) -> bool {
                 | WM_CHAR
                 | WM_SETCURSOR
                 | WM_DEVICECHANGE
-        )
+        );
+
+    #[cfg(not(windows))]
+    todo!()
 }
