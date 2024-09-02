@@ -1,6 +1,7 @@
 use crate::utils::find_window;
 use anyhow::Context;
 
+#[cfg(all(windows, feature = "directx11"))]
 pub mod dx11;
 pub mod fonts;
 #[cfg(windows)]
