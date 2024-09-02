@@ -1,9 +1,8 @@
 use crate::{common, utils::module_handler};
 use anyhow::bail;
-use common::{c_void, Mutex};
+use common::{c_void, Handle, Mutex};
 
 use once_cell::sync::OnceCell;
-use windows::Win32::Foundation::HMODULE;
 
 /// A `Module` represents a dynamically loaded module.
 ///
@@ -19,7 +18,7 @@ pub struct Module {
     name: &'static str,
 
     /// The handle to the loaded module.
-    handle: HMODULE,
+    handle: Handle,
 }
 
 impl Module {
