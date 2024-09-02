@@ -1,5 +1,5 @@
 pub use std::{
-    ffi::{c_char, c_int, c_void, CString},
+    ffi::{c_char, c_int, c_void, CStr, CString},
     mem::{size_of, transmute},
     slice,
     sync::Once,
@@ -36,3 +36,9 @@ macro_rules! cast {
         $address as *const $type
     };
 }
+
+#[derive(Clone, Debug)]
+#[repr(transparent)]
+pub struct Handle(pub *mut c_void);
+// TODO: switch to usize instead of pointer with deref to pointer? avoids this unsafe
+unsafe impl Send for Handle {}
