@@ -16,16 +16,10 @@ use windows::Win32::{
 };
 
 /// This function is responsible for initializing the cheat.
-/// It is called as a thread function when the DLL is loaded into a process.
-///
-/// # Parameters
-///
-/// None.
-///
-/// # Return Value
-///
-/// Returns a `u32` value of 0. This value is not used by the operating system.
-extern "system" fn thread_startup(_: *mut c_void) -> u32 {
+/// It is executed once when the library gets loaded. Note: see thread_startup and DllMain for
+/// behaviour on Windows.
+#[cfg_attr(not(windows), ctor::ctor)]
+fn startup() {
     match core::bootstrap::initialize() {
         Err(e) => {
             tracing::error!("init failed: {e}");
@@ -34,7 +28,13 @@ extern "system" fn thread_startup(_: *mut c_void) -> u32 {
             tracing::info!("initialized cheat successfully!");
         }
     }
+}
 
+/// This function is called as a thread function when the DLL is loaded into a process.
+/// Only used on Windows.
+#[cfg(windows)]
+extern "system" fn thread_startup(_: *mut c_void) -> u32 {
+    startup();
     0
 }
 

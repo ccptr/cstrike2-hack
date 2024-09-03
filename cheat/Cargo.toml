@@ -37,6 +37,7 @@ iced-x86 = "1.21.0"
 retour = "0.3.1"
 ash = { version = "0.38", optional = true }
 gher = { git = "https://codeberg.org/ccptr/rust-gher.git" }
+ctor = "0.2.8"
 
 [target.'cfg(windows)'.dependencies]
 egui-directx11 = { path = "../egui/egui-directx11", optional = true }
