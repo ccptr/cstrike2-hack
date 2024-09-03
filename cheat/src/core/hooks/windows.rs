@@ -10,7 +10,7 @@ pub mod dx11 {
         Win32::Graphics::Dxgi::{Common::DXGI_FORMAT, IDXGISwapChain},
     };
 
-    extern "system" fn hk_present(
+    pub extern "system" fn hk_present(
         swapchain: IDXGISwapChain,
         sync_interval: u32,
         flags: u32,
@@ -22,7 +22,7 @@ pub mod dx11 {
         original_fn(swapchain, sync_interval, flags)
     }
 
-    extern "system" fn hk_resize_buffers(
+    pub extern "system" fn hk_resize_buffers(
         swapchain: IDXGISwapChain,
         buffer_count: u32,
         width: u32,
@@ -46,6 +46,6 @@ pub mod dx11 {
             .resize_buffers(&swapchain, || {
                 original_fn(swapchain.clone(), buffer_count, width, height, new_format, swapchain_flags)
             })
-        .expect("could not resize buffers")
+            .expect("could not resize buffers")
     }
 }
