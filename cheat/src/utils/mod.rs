@@ -27,7 +27,8 @@ mod win32 {
     /// * `true` if the specified window is the main window of the current process.
     /// * `false` if the specified window is not the main window of the current process.
     unsafe fn is_main_window(window: HWND) -> bool {
-        GetWindow(window, GW_OWNER).0 == 0 && IsWindowVisible(window).into()
+        GetWindow(window, GW_OWNER).unwrap_or_default().0
+            .is_null() && IsWindowVisible(window) == TRUE
     }
 
     /// An unsafe extern "system" function used as a callback for the `EnumWindows` function.

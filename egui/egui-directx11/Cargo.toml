@@ -9,7 +9,7 @@ license = "MIT"
 [dependencies]
 thiserror = "1.0.49"
 egui = "0.22.0"
-windows = { version = "0.51.1", features = [
+windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Foundation_Numerics",
     "Win32_Graphics_Direct3D",
