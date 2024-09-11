@@ -79,11 +79,7 @@ mod windows {
             EnumWindows(Some(enum_window), LPARAM(std::ptr::from_mut::<HWND>(&mut hwnd) as isize))
         };
 
-        if hwnd.0 == 0 {
-            None
-        } else {
-            Some(hwnd)
-        }
+        hwnd.into()
     }
 }
 

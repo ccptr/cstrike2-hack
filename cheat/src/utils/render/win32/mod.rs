@@ -74,7 +74,7 @@ pub fn setup(window: impl Into<HWND>) -> anyhow::Result<()> {
 /// * `Result<(), anyhow::Error>`: Returns `Ok(())` if the destruction is successful.
 ///   Returns an error if the `WNDPROC` or `INPUT` is not initialized.
 pub fn destroy() -> anyhow::Result<()> {
-    let window = find_window().context("could not find window")?;
+    let window: HWND = find_window().context("could not find window")?.into();
 
     let Some(Some(wndproc)) = WNDPROC.get() else {
         bail!("WNDPROC is not initialized");
