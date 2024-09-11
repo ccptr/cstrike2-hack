@@ -33,7 +33,9 @@ pub static INPUT: OnceLock<Mutex<InputManager>> = OnceLock::new();
 /// # Panics
 ///
 /// This function does not panic. However, if the `SetWindowLongPtrA` function fails, it may cause undefined behavior.
-pub fn setup(window: HWND) -> anyhow::Result<()> {
+pub fn setup(window: impl Into<HWND>) -> anyhow::Result<()> {
+    let window = window.into();
+
     // SAFETY:
     // - `wndproc_hk` is a valid function pointer with the correct signature.
     // - `SetWindowLongPtrA` expects a pointer to a window procedure, which is provided as `wndproc_hk` cast to `isize`.
