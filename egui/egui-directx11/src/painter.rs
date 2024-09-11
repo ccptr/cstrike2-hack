@@ -49,6 +49,8 @@ pub struct DirectX11Renderer {
     context: egui::Context,
 }
 
+unsafe impl Send for DirectX11Renderer {}
+
 impl DirectX11Renderer {
     const INPUT_ELEMENTS_DESC: [D3D11_INPUT_ELEMENT_DESC; 3] = [
         D3D11_INPUT_ELEMENT_DESC {
@@ -88,11 +90,10 @@ impl DirectX11Renderer {
         context: egui::Context,
     ) -> Result<Self, RenderError> {
         unsafe {
-            let mut swap_chain_desc = DXGI_SWAP_CHAIN_DESC::default();
-            swapchain.GetDesc(&mut swap_chain_desc)?;
+            let swap_chain_desc = swapchain.GetDesc()?;
 
             let hwnd = swap_chain_desc.OutputWindow;
-            if hwnd.0 == -1 {
+            if hwnd.0 == -1 as _ {
                 return Err(RenderError::General(
                     "Trying to initialize from a swapchain with an invalid hwnd",
                 ));

@@ -27,6 +27,8 @@ pub struct InputManager {
     modifiers: Option<Modifiers>,
 }
 
+unsafe impl Send for InputManager {}
+
 /// High-level overview of recognized `WndProc` messages.
 #[repr(u8)]
 pub enum InputResult {
@@ -276,7 +278,7 @@ impl InputManager {
     pub fn get_system_time() -> Result<f64> {
         let mut time = 0;
         unsafe {
-            NtQuerySystemTime(&mut time)?;
+            NtQuerySystemTime(&mut time).ok()?;
         }
 
         // dumb ass, read the docs. egui clearly says `in seconds`.
