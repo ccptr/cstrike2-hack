@@ -39,6 +39,25 @@ macro_rules! cast {
 
 #[derive(Clone, Debug)]
 #[repr(transparent)]
-pub struct Handle(pub *mut c_void);
-// TODO: switch to usize instead of pointer with deref to pointer? avoids this unsafe
+pub struct Handle(pub *mut core::ffi::c_void);
+
+#[cfg(windows)]
+use windows::Win32::Foundation::HWND;
+#[cfg(windows)]
+impl From<HWND> for Handle {
+    fn from(hwnd: HWND) -> Self {
+        Self(hwnd.0 as _)
+    }
+}
+#[cfg(windows)]
+impl Into<HWND> for Handle {
+    fn into(self) -> HWND {
+        HWND(self.0)
+    }
+}
+
+// SAFETY: a handle should not change until it is free'd, after which the handle
+// can (and should) no longer be used. It is assumed the users of this type are
+// aware of that. See the following link, notably the section about pointers:
+// https://doc.rust-lang.org/nomicon/send-and-sync.html
 unsafe impl Send for Handle {}
